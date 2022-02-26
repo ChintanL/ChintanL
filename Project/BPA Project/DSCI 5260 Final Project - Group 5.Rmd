@@ -1,0 +1,294 @@
+---
+title: "DSCI 5260 Final Project - Group 5"
+author: "ChintanR"
+date: "11/17/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Loading Packages
+pacman::p_load(tidyr, mice, glmnet, shiny, tidyverse, caret, MASS, rmarkdown, leaflet, lattice,  rpart, rpart.plot,randomForest, gbm, tree, ggplot2,cluster, plyr, ISLR, MASS, htmltools, dplyr, widgetframe, esquisse, htmlwidgets, scales, naniar,
+               reshape2, factoextra, readr, DataExplorer,skimr, lubridate, fpp3, GGally, gridExtra, tsibble)
+options(max.print = 10000000)
+```
+
+```{r}
+#Loading libraries
+
+library(githubinstall)
+library(devtools)
+library(mice)
+library(readr)
+library(VIM)
+library(ggplot2)
+library(pacman)
+library(cluster)
+library(factoextra)
+library(ISLR)
+library(MASS)
+library(readr)
+library(devtools)
+library(data.table)
+library(dplyr)
+library(plyr)
+library(skimr)
+library(DataExplorer)
+```
+
+
+```{r}
+#Loading in the data
+cardata <- read.csv("car_data_df.csv")
+head(cardata)
+```
+
+
+```{r}
+#Searching for Missing Values
+summary(cardata)
+```
+```{r}
+cardata_Miss = aggr(cardata, col=mdc(1:2),
+                              numbers=TRUE, sortVars=TRUE,
+                              labels=names(cardata), cex.axis=.7,
+                              gap=3, ylab=c("Proportion of
+missingness","Missingness Pattern"))
+p <- function(x) {sum(is.na(x))/length(x)*100}
+apply(cardata, 2, p)
+md.pattern(cardata, plot = TRUE)
+```
+
+##We can see 377308 missing values in TAx.A.. column. We drop it.
+```{r}
+#Change the fuelType and Transmission from chr to factors
+cardata$fuelType <- factor(cardata$fuelType)
+cardata$transmission <- as.factor(cardata$transmission)
+cardata <- cardata[-c(10)]
+summary(cardata)
+```
+
+```{r}
+cardata.df.plot1 <- ggplot(cardata) +
+  geom_point(aes(price, fuelType), size = 3, shape = 19) +
+  scale_color_manual(values=c('red', 'blue')) +
+  xlab("Price of Cars") +
+  ylab("Fuel Type")
+cardata.df.plot1
+
+```
+```{r}
+
+cardata.df.plot2 <- ggplot(cardata) +
+  geom_point(aes(price, engineSize), size = 3, shape = 19) +
+  scale_color_manual(values=c('red', 'blue')) +
+  xlab("Price of Cars") +
+  ylab("Engine Size")
+cardata.df.plot2
+```
+
+```{r}
+cardata.df.plot3 <- ggplot(cardata) +
+  geom_point(aes(transmission, price), size = 3, shape = 19) +
+  scale_color_manual(values=c('red', 'blue')) +
+  xlab("Transmission Size") +
+  ylab("Price of Cars")
+cardata.df.plot3
+```
+
+```{r}
+cardata.df.plot4 <- ggplot(cardata) +
+  geom_point(aes(price, year), size = 3, shape = 19) +
+  scale_color_manual(values=c('red', 'blue')) +
+  xlab("Price of Cars") +
+  ylab("Year Built")
+cardata.df.plot4
+
+```
+
+```{r}
+cardata.df.plot5 <- ggplot(cardata) +
+  geom_point(aes(price, mileage), size = 3, shape = 19) +
+  scale_color_manual(values=c('red', 'blue')) +
+  xlab("Price of Cars") +
+  ylab("mileage")
+cardata.df.plot5
+```
+
+```{r}
+cardata.df.plot6 <- ggplot(cardata) +
+  geom_point(aes(price, mpg), size = 3, shape = 19) +
+  scale_color_manual(values=c('red', 'blue')) +
+  xlab("Price of Cars") +
+  ylab("Miles Per Gallon")
+cardata.df.plot6
+```
+
+
+
+```{r}
+#Looking at the range of year and changing the uncorrect year value
+range(cardata$year)
+cardata$year[cardata$year == 2060] <- 2017
+
+```
+
+```{r}
+#Looking at the summary of year and MPG
+summary(cardata$year)
+summary(cardata$mpg)
+```
+
+
+```{r}
+#Imputing the missing values in Tax with mean
+cardata$tax[is.na(cardata$tax)] <- 120.3
+summary(cardata)
+```
+
+
+```{r}
+#Running Principal Component Analysis
+str(cardata)
+pcs <- prcomp(cardata[,-c(1,4,6)],scale. = T) 
+summary(pcs)
+pcs$rot
+```
+
+```{r}
+#Plotting PCA
+fviz_eig(pcs, barfill = "bisque", barcolor = "NA", linecolor = "blue")
+```
+
+```{r}
+#Splitting Data 
+ind <- sample(2, nrow(cardata),replace = TRUE, prob =
+                c(0.8,0.2))
+traindata <- cardata[ind==1,]
+testdata <- cardata[ind==2,]
+head(traindata)
+head(testdata)
+```
+
+
+```{r}
+#Running Linear Regression Model
+Model1<-lm(price ~ year + mpg + engineSize + mileage, data = traindata)
+
+summary(Model1)
+```
+## We got RSE of 70.08%
+
+```{r}
+#Using Prediction Model to our test Data
+LMPred <- predict(Model1, testdata)
+
+actuals_preds <- data.frame(cbind(actuals=testdata$price, predicteds=LMPred))
+# make actuals_predicteds dataframe.
+correlation_accuracy <- cor(actuals_preds)
+correlation_accuracy
+```
+
+```{r}
+#Accuracy of 54% with Linear Regression Model
+```
+
+
+
+```{r}
+#Decision Tree Model 
+set.seed(42)
+           
+tree.train <- tree(price~ year + engineSize+transmission+fuelType + mileage + mpg,traindata)
+summary(tree.train)
+```
+
+```{r}
+#Plotting Decision Train
+plot(tree.train)
+text(tree.train, pretty = 5)
+```
+
+```{r}
+#Using Drecision Tree Model to predict
+p <- predict(tree.train, testdata)
+summary(p)
+Tree_preds <- data.frame(cbind(actual=testdata$price, predicted=p))
+correlation_acc <- cor(Tree_preds)
+correlation_acc
+
+```
+## We get an accuracy of 54%
+
+
+
+```{r}
+#Ridge Regression Model
+y = traindata$price
+x = data.matrix(traindata[,c('year', 'engineSize', 'tax', 'mileage', 'mpg')])
+model <- glmnet(x, y , alpha = 0)
+summary(model)
+```
+
+```{r}
+#k-fold cross-validation to find optimal lambda value
+cv_model <- cv.glmnet(x, y, alpha = 0)
+
+#find optimal lambda value that minimizes test MSE
+best_lambda <- cv_model$lambda.min
+best_lambda
+
+#produce plot of test MSE by lambda value
+plot(cv_model)
+```
+```{r}
+#find coefficients of best model
+best_model <- glmnet(x, y, alpha = 0, lambda = best_lambda)
+coef(best_model)
+```
+
+```{r}
+#use fitted best model to make predictions
+d = data.matrix(testdata[,c('year', 'engineSize', 'tax', 'mileage', 'mpg')])
+y_predicted <- predict(model, s = best_lambda, newx= d)
+Ridge_preds <- data.frame(cbind(actual=testdata$price, prediction=y_predicted))
+
+Ridge_accuracy <- cor(Ridge_preds)
+Ridge_accuracy
+```
+## We get an accuracy of 54%
+
+```{r}
+#LASSO Regression
+
+LR_cv_model <- cv.glmnet(x, y, alpha = 1)
+best_lambda_LR <- LR_cv_model$lambda.min
+best_lambda_LR
+
+#produce plot of test MSE by lambda value
+plot(LR_cv_model) 
+
+LR_best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda_LR)
+coef(LR_best_model)
+
+```
+
+```{r}
+#use fitted best model to make predictions
+y_predicted_LR <- predict(LR_best_model, s = best_lambda_LR, newx = d)
+
+Lasso_preds <- data.frame(cbind(actual=testdata$price, prediction=y_predicted_LR))
+
+Lasso_accuracy <- cor(Lasso_preds)
+Lasso_accuracy
+```
+## We get an accuracy of 54%
+
+```{r}
+create_report(cardata)
+```
+
+
